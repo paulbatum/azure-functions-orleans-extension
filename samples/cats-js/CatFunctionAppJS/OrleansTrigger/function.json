@@ -1,0 +1,9 @@
+{
+  "bindings": [
+    {
+      "name": "mystate",
+      "type": "OrleansActorTrigger",
+      "direction": "in"
+    }
+  ]
+}
