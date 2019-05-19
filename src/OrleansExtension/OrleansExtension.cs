@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,24 +12,38 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 {
     [Extension("Orleans", "Orleans")]
-    internal class OrleansExtensionConfigProvider : IExtensionConfigProvider
+    internal class OrleansExtension : IExtensionConfigProvider
     {
         private readonly IConfiguration _configuration;
         private readonly INameResolver _nameResolver;
+        private readonly ISiloHostBuilder _siloHostBuilder;
+        private readonly OrleansStartupTriggerBindingProvider _startupTriggerProvider;
+        private readonly OrleansActorTriggerBindingProvider _actorTriggerProvider;
         private ILogger _logger;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ConcurrentDictionary<Tuple<string, string>, IClusterClient> _clientCache = new ConcurrentDictionary<Tuple<string, string>, IClusterClient>();
 
 
-        public OrleansExtensionConfigProvider(ILoggerFactory loggerFactory, IConfiguration configuration, INameResolver nameResolver)
+        public OrleansExtension(
+            ILoggerFactory loggerFactory, 
+            IConfiguration configuration, 
+            INameResolver nameResolver,
+            OrleansStartupTriggerBindingProvider startupTriggerProvider,
+            OrleansActorTriggerBindingProvider actorTriggerProvider,
+            ISiloHostBuilder siloHostBuilder,
+            IServiceProvider serviceProvider)
         {
             _loggerFactory = loggerFactory;
             _configuration = configuration;
             _nameResolver = nameResolver;
+            _startupTriggerProvider = startupTriggerProvider;
+            _actorTriggerProvider = actorTriggerProvider;
+            _siloHostBuilder = siloHostBuilder;
         }
 
         public void Initialize(ExtensionConfigContext context)
@@ -38,16 +53,26 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
                 throw new ArgumentNullException("context");
             }
 
+            _siloHostBuilder
+                .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "dev"; // TODO: pull these from the config
+                    options.ServiceId = "AdventureApp";
+                })
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
+
             _logger = _loggerFactory.CreateLogger(LogCategories.CreateTriggerCategory("Orleans"));
 
             var inputRule = context.AddBindingRule<OrleansAttribute>();
             inputRule.BindToInput(new ClusterClientBuilder(this));
 
+            
             var startupTriggerRule = context.AddBindingRule<OrleansStartupTriggerAttribute>();
-            startupTriggerRule.BindToTrigger<IServiceProvider>(new OrleansStartupTriggerBindingProvider(_loggerFactory, _configuration, _nameResolver));
+            startupTriggerRule.BindToTrigger<IServiceProvider>(_startupTriggerProvider);
 
             var actorTriggerRule = context.AddBindingRule<OrleansActorTriggerAttribute>();
-            actorTriggerRule.BindToTrigger<ActorCallData>(new OrleansActorTriggerBindingProvider(_loggerFactory));
+            actorTriggerRule.BindToTrigger<ActorCallData>(_actorTriggerProvider);
             actorTriggerRule.AddConverter<ActorCallData, string>(x => x.State);
 
         }
@@ -58,7 +83,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             {
                 var clientBuilder = new ClientBuilder();                
 
-                var client = clientBuilder
+                var client = clientBuilder                
                     .UseLocalhostClustering()
                     .Configure<ClusterOptions>(options =>
                     {
@@ -79,9 +104,9 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 
         private class ClusterClientBuilder : IAsyncConverter<OrleansAttribute, IClusterClient>
         {
-            OrleansExtensionConfigProvider _provider;
+            OrleansExtension _provider;
 
-            public ClusterClientBuilder(OrleansExtensionConfigProvider provider)
+            public ClusterClientBuilder(OrleansExtension provider)
             {
                 _provider = provider;
             }

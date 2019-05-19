@@ -7,20 +7,21 @@ using Microsoft.Azure.WebJobs.Host.Triggers;
 using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Orleans.Hosting;
 
 namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 {
     internal class OrleansStartupTriggerBindingProvider : ITriggerBindingProvider
     {
         private readonly ILogger _logger;
-        private IConfiguration _configuration;
-        private INameResolver _nameResolver;        
+        private readonly IConfiguration _configuration;
+        private readonly ISiloHostBuilder _builder;         
 
-        public OrleansStartupTriggerBindingProvider(ILoggerFactory loggerFactory, IConfiguration configuration, INameResolver nameResolver)
+        public OrleansStartupTriggerBindingProvider(ILoggerFactory loggerFactory, IConfiguration configuration, ISiloHostBuilder siloHostBuilder)
         {
             _logger = loggerFactory.CreateLogger(LogCategories.CreateTriggerCategory("OrleansStartup"));
-            this._configuration = configuration;
-            this._nameResolver = nameResolver;
+            _configuration = configuration;
+            _builder = siloHostBuilder;
         }
 
         public Task<ITriggerBinding> TryCreateAsync(TriggerBindingProviderContext context)
@@ -33,10 +34,9 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
                 return Task.FromResult<ITriggerBinding>(null);
             }
 
-            var resolvedSetting = _configuration.GetConnectionStringOrSetting(attribute.PersistenceConnectionStringSetting);
-
-
-            return Task.FromResult<ITriggerBinding>(new OrleansStartupTriggerBinding(parameter, attribute.GrainType?.Assembly, resolvedSetting, _logger));
+            var resolvedSetting = _configuration.GetConnectionStringOrSetting(attribute.PersistenceConnectionStringSetting);            
+            
+            return Task.FromResult<ITriggerBinding>(new OrleansStartupTriggerBinding(parameter, attribute.GrainType?.Assembly, resolvedSetting, _builder, _logger));
         }
     }
 }

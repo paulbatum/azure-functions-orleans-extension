@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,6 +9,9 @@ using Microsoft.Azure.WebJobs.Host.Listeners;
 using Microsoft.Azure.WebJobs.Host.Protocols;
 using Microsoft.Azure.WebJobs.Host.Triggers;
 using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Hosting;
 
 namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 {
@@ -16,6 +20,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
         private readonly ParameterInfo _parameter;
         private readonly ILogger _logger;
         private readonly Assembly _grainAssembly;
+        private readonly ISiloHostBuilder _builder;
         private readonly string _persistenceConnectionString;
         private readonly IReadOnlyDictionary<string, Type> _emptyBindingContract = new Dictionary<string, Type>();
         private readonly IReadOnlyDictionary<string, object> _emptyBindingData = new Dictionary<string, object>();
@@ -24,12 +29,14 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             ParameterInfo parameter,
             Assembly grainAssembly,
             string persistenceConnectionString,
+            ISiloHostBuilder builder,
             ILogger logger)
         {
-            _parameter = parameter;
-            _logger = logger;
+            _parameter = parameter;            
             _grainAssembly = grainAssembly;
             _persistenceConnectionString = persistenceConnectionString;
+            _builder = builder;
+            _logger = logger;
         }
 
         public Type TriggerValueType => typeof(IServiceProvider);
@@ -47,7 +54,14 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 
         public Task<IListener> CreateListenerAsync(ListenerFactoryContext context)
         {
-            return Task.FromResult<IListener>(new OrleansStartupTriggerListener(context.Executor, _grainAssembly, _persistenceConnectionString, this._logger));
+            var listener = new OrleansStartupTriggerListener(context.Executor, _grainAssembly, _persistenceConnectionString, _logger);
+
+            _builder
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(_grainAssembly).WithReferences())
+                .AddStartupTask((services, cancellationToken) => listener.ExecuteAsync(services, cancellationToken))
+                .AddAzureTableGrainStorage("TableStore", options => options.ConnectionString = _persistenceConnectionString);
+
+            return Task.FromResult<IListener>(listener);
         }
 
         public ParameterDescriptor ToParameterDescriptor()

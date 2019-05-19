@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -11,9 +13,14 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             if (builder == null)
             {
                 throw new ArgumentNullException(nameof(builder));
-            }
+            }            
+            
+            builder.Services.AddSingleton<ISiloHostBuilder>(new SiloHostBuilder());
+            builder.Services.AddSingleton<OrleansStartupTriggerBindingProvider>();
+            builder.Services.AddSingleton<OrleansActorTriggerBindingProvider>();
+            builder.Services.AddHostedService<OrleansHostedService>();
 
-            builder.AddExtension<OrleansExtensionConfigProvider>();           
+            builder.AddExtension<OrleansExtension>();            
             return builder;
         }
     }

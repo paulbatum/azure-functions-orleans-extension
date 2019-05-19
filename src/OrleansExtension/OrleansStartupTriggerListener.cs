@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 
 namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 {
@@ -21,7 +22,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
         private readonly ILogger _logger;
         private readonly Assembly _grainAssembly;
         private readonly string _persistenceConnectionString;
-        private ISiloHost _host;
+        private bool _listening;
 
         public OrleansStartupTriggerListener(
             ITriggeredFunctionExecutor executor,
@@ -29,10 +30,11 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             string persistenceConnectionString,
             ILogger logger)
         {
-            this._executor = executor;
-            this._logger = logger;
-            this._grainAssembly = grainAssembly;
-            this._persistenceConnectionString = persistenceConnectionString;
+            _executor = executor;
+            _logger = logger;
+            _grainAssembly = grainAssembly;
+            _persistenceConnectionString = persistenceConnectionString;
+            _listening = false;
         }
 
         public void Cancel()
@@ -42,44 +44,28 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 
         public void Dispose()
         {
-            _host.Dispose();
+            
         }
 
-        public async Task StartAsync(CancellationToken cancellationToken)
+        public Task StartAsync(CancellationToken cancellationToken)
         {
-            InitializeHost();
-            await _host.StartAsync();
+            _listening = true;
+            return Task.CompletedTask;
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
+        public Task StopAsync(CancellationToken cancellationToken)
         {
-            if (_host != null)
-                await _host.StopAsync();
+            _listening = false;
+            return Task.CompletedTask;
         }
 
-        private void InitializeHost()
+        public async Task ExecuteAsync(IServiceProvider services, CancellationToken cancellationToken)
         {
-            if (_host == null)
+            if(_listening)
             {
-                var builder = new SiloHostBuilder()
-                   .UseLocalhostClustering()
-                   .Configure<ClusterOptions>(options =>
-                   {
-                       options.ClusterId = "dev"; // TODO: pull these from the config
-                       options.ServiceId = "AdventureApp";
-                   })
-                   .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                   .ConfigureApplicationParts(parts => parts.AddApplicationPart(_grainAssembly).WithReferences())
-                   .AddAzureTableGrainStorage("TableStore", options => options.ConnectionString = _persistenceConnectionString)
-                   .AddStartupTask((services, cancellationToken) =>
-                   {
-                       return _executor.TryExecuteAsync(new TriggeredFunctionData { TriggerValue = services }, cancellationToken);
-                   });
-
-                _host = builder.Build();
+                await _executor.TryExecuteAsync(new TriggeredFunctionData { TriggerValue = services }, cancellationToken);
             }
         }
-
     }
 
 
