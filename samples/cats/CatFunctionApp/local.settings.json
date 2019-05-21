@@ -1,0 +1,9 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "AzureFunctionsJobHost:extensions:Orleans:ClusterId": "dev",
+    "AzureFunctionsJobHost:extensions:Orleans:ServiceId": "AdventureApp"
+  }
+}
