@@ -10,9 +10,16 @@ using Newtonsoft.Json;
 using Microsoft.Azure.WebJobs.Extensions.Orleans;
 using Orleans;
 using Orleans.Providers;
+using System.Diagnostics;
 
 namespace CatFunctionApp
 {
+    public class CatEventMessage
+    {
+        public string CatName { get; set; }
+        public string EventName { get; set; }
+    }
+
     public interface ICatGrain : IGrainWithStringKey
     {
         Task Eat();
@@ -47,10 +54,22 @@ namespace CatFunctionApp
             return new OkObjectResult(status);
         }
 
+        [FunctionName("CatQueueProcessor")]
         public static async Task ProcessCatEvent(
-            [QueueTrigger()]
+            [QueueTrigger("catqueue", Connection = "AzureWebJobsStorage")] CatEventMessage message,
+            [Orleans] IClusterClient orleansClient,
             ILogger log)
         {
+            var cat = orleansClient.GetGrain<ICatGrain>(message.CatName);
+
+            switch (message.EventName)
+            {
+                case "Eat":
+                    await cat.Eat();
+                    break;
+                default:
+                    throw new ApplicationException($"Unrecognized event name: '{message.EventName}'.");
+            }
 
         }
 
