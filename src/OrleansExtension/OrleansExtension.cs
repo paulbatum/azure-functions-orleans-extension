@@ -23,7 +23,6 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
         private readonly IConfiguration _configuration;
         private readonly INameResolver _nameResolver;
         private readonly ISiloHostBuilder _siloHostBuilder;
-        private readonly OrleansStartupTriggerBindingProvider _startupTriggerProvider;
         private readonly OrleansActorTriggerBindingProvider _actorTriggerProvider;
         private ILogger _logger;
         private readonly ILoggerFactory _loggerFactory;
@@ -34,7 +33,6 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             ILoggerFactory loggerFactory, 
             IConfiguration configuration, 
             INameResolver nameResolver,
-            OrleansStartupTriggerBindingProvider startupTriggerProvider,
             OrleansActorTriggerBindingProvider actorTriggerProvider,
             ISiloHostBuilder siloHostBuilder,
             IServiceProvider serviceProvider,
@@ -43,7 +41,6 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             _loggerFactory = loggerFactory;
             _configuration = configuration;
             _nameResolver = nameResolver;
-            _startupTriggerProvider = startupTriggerProvider;
             _actorTriggerProvider = actorTriggerProvider;
             _siloHostBuilder = siloHostBuilder;
             _extensionOptions = extensionOptions.Value;
@@ -71,11 +68,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             _logger = _loggerFactory.CreateLogger(LogCategories.CreateTriggerCategory("Orleans"));
 
             var inputRule = context.AddBindingRule<OrleansAttribute>();
-            inputRule.BindToInput(new ClusterClientBuilder(this));
-
-            
-            var startupTriggerRule = context.AddBindingRule<OrleansStartupTriggerAttribute>();
-            startupTriggerRule.BindToTrigger<IServiceProvider>(_startupTriggerProvider);
+            inputRule.BindToInput(new ClusterClientBuilder(this));            
 
             var actorTriggerRule = context.AddBindingRule<OrleansActorTriggerAttribute>();
             actorTriggerRule.BindToTrigger<ActorCallData>(_actorTriggerProvider);

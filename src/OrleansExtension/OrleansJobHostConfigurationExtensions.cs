@@ -15,8 +15,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
                 throw new ArgumentNullException(nameof(builder));
             }            
             
-            builder.Services.AddSingleton<ISiloHostBuilder>(new SiloHostBuilder());
-            builder.Services.AddSingleton<OrleansStartupTriggerBindingProvider>();
+            builder.Services.AddSingleton<ISiloHostBuilder>(new SiloHostBuilder());            
             builder.Services.AddSingleton<OrleansActorTriggerBindingProvider>();
             builder.Services.AddHostedService<OrleansHostedService>();
 
