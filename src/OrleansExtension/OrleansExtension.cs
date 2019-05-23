@@ -10,6 +10,7 @@ using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -27,7 +28,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
         private ILogger _logger;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ConcurrentDictionary<Tuple<string, string>, IClusterClient> _clientCache = new ConcurrentDictionary<Tuple<string, string>, IClusterClient>();
-
+        private readonly OrleansOptions _extensionOptions;
 
         public OrleansExtension(
             ILoggerFactory loggerFactory, 
@@ -36,7 +37,8 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             OrleansStartupTriggerBindingProvider startupTriggerProvider,
             OrleansActorTriggerBindingProvider actorTriggerProvider,
             ISiloHostBuilder siloHostBuilder,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            IOptions<OrleansOptions> extensionOptions)
         {
             _loggerFactory = loggerFactory;
             _configuration = configuration;
@@ -44,6 +46,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             _startupTriggerProvider = startupTriggerProvider;
             _actorTriggerProvider = actorTriggerProvider;
             _siloHostBuilder = siloHostBuilder;
+            _extensionOptions = extensionOptions.Value;
         }
 
         public void Initialize(ExtensionConfigContext context)
@@ -60,7 +63,10 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
                     options.ClusterId = "dev"; // TODO: pull these from the config
                     options.ServiceId = "AdventureApp";
                 })
-                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback);
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .AddAzureTableGrainStorage(_extensionOptions.StorageProviderName, options => {
+                    options.ConnectionString = _configuration.GetConnectionStringOrSetting(_extensionOptions.StorageProviderSettingName);
+                });
 
             _logger = _loggerFactory.CreateLogger(LogCategories.CreateTriggerCategory("Orleans"));
 

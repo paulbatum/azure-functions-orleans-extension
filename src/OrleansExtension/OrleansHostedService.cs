@@ -26,7 +26,9 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await _siloHost?.StopAsync();
+            await _siloHost?.StopAsync(cancellationToken);
+            _siloHost?.Dispose();
+            _siloHost = null;
         }
     }
 }
