@@ -12,10 +12,14 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
     class OrleansActorTriggerBindingProvider : ITriggerBindingProvider
     {
         private readonly ILogger _logger;
+        private readonly GrainExecutor _grainExecutor;
 
-        public OrleansActorTriggerBindingProvider(ILoggerFactory loggerFactory)
+        public OrleansActorTriggerBindingProvider(
+            ILoggerFactory loggerFactory,
+            GrainExecutor grainExecutor)
         {
             _logger = loggerFactory.CreateLogger(LogCategories.CreateTriggerCategory("OrleansActor"));
+            _grainExecutor = grainExecutor;
         }
 
         public Task<ITriggerBinding> TryCreateAsync(TriggerBindingProviderContext context)
@@ -29,7 +33,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             }
 
 
-            return Task.FromResult<ITriggerBinding>(new OrleansActorTriggerBinding(parameter, _logger));
+            return Task.FromResult<ITriggerBinding>(new OrleansActorTriggerBinding(parameter, attribute.GrainType, _logger, _grainExecutor));
         }
     }
 }

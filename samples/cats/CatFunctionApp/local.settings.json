@@ -6,6 +6,6 @@
     "AzureFunctionsJobHost:extensions:Orleans:ClusterId": "dev",
     "AzureFunctionsJobHost:extensions:Orleans:ServiceId": "AdventureApp",
     "AzureFunctionsJobHost:extensions:Orleans:StorageProviderName": "TableStore",
-    "AzureFunctionsJobHost:extensions:Orleans:StorageProviderSettingName": "AzureWebJobsStorage"
+    "OrleansStorageProviderConnectionString": "UseDevelopmentStorage=true"
   }
 }

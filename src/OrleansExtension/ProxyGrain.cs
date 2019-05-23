@@ -8,8 +8,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 {
     public interface IProxyGrain : IGrainWithGuidKey
     {
-        Task SetState(string state);
-        Task Call(string eventName, string data);
+        Task Call(string grainType, string eventName, string data);
     }
 
     public class ProxyGrain : Grain, IProxyGrain
@@ -29,10 +28,11 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             return Task.CompletedTask;
         }
 
-        public async Task Call(string eventName, string data)
+        public async Task Call(string grainType, string eventName, string data)
         {
             await _executor.ExecuteAsync(new ActorCallData
             {
+                GrainType = grainType,
                 State = _state,
                 EventName = eventName,
                 Data = data

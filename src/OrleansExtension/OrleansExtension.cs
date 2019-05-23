@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ using Microsoft.Azure.WebJobs.Description;
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Logging;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -28,6 +30,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
         private readonly ILoggerFactory _loggerFactory;
         private readonly ConcurrentDictionary<Tuple<string, string>, IClusterClient> _clientCache = new ConcurrentDictionary<Tuple<string, string>, IClusterClient>();
         private readonly OrleansOptions _extensionOptions;
+        private readonly GrainExecutor _grainExecutor;
 
         public OrleansExtension(
             ILoggerFactory loggerFactory, 
@@ -36,7 +39,8 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             OrleansActorTriggerBindingProvider actorTriggerProvider,
             ISiloHostBuilder siloHostBuilder,
             IServiceProvider serviceProvider,
-            IOptions<OrleansOptions> extensionOptions)
+            IOptions<OrleansOptions> extensionOptions,
+            GrainExecutor grainExecutor)
         {
             _loggerFactory = loggerFactory;
             _configuration = configuration;
@@ -44,6 +48,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
             _actorTriggerProvider = actorTriggerProvider;
             _siloHostBuilder = siloHostBuilder;
             _extensionOptions = extensionOptions.Value;
+            _grainExecutor = grainExecutor;
         }
 
         public void Initialize(ExtensionConfigContext context)
@@ -55,14 +60,28 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 
             _siloHostBuilder
                 .UseLocalhostClustering()
+                .ConfigureLogging(logging =>
+                {
+                    //logging.AddConfiguration(_configuration);                    
+                    //logging.AddProvider(_loggerFactory.);/
+                })
                 .Configure<ClusterOptions>(options =>
                 {
                     options.ClusterId = "dev"; // TODO: pull these from the config
                     options.ServiceId = "AdventureApp";
                 })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .ConfigureServices(services =>
+                {
+                    services.AddSingleton<IProxyGrainExecutor>(_grainExecutor);
+                })
+                .ConfigureApplicationParts(parts => {
+                    parts.AddFromAppDomain().WithReferences();
+                    
+                })
+                //.ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ProxyGrain).Assembly))
                 .AddAzureTableGrainStorage(_extensionOptions.StorageProviderName, options => {
-                    options.ConnectionString = _configuration.GetConnectionStringOrSetting(_extensionOptions.StorageProviderSettingName);
+                    options.ConnectionString = _extensionOptions.StorageProviderConnectionString;
                 });
 
             _logger = _loggerFactory.CreateLogger(LogCategories.CreateTriggerCategory("Orleans"));
@@ -100,6 +119,8 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 
             return resolvedClient;
         }
+
+        
 
         private class ClusterClientBuilder : IAsyncConverter<OrleansAttribute, IClusterClient>
         {

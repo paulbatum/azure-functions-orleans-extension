@@ -14,18 +14,23 @@ using Orleans.Hosting;
 
 namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 {
-    internal class OrleansActorTriggerListener : IListener, IProxyGrainExecutor
+    internal class OrleansActorTriggerListener : IListener
     {
-        private readonly ITriggeredFunctionExecutor _executor;
-        private readonly ILogger _logger;        
-        private ISiloHost _host;
+        private readonly ITriggeredFunctionExecutor _functionExecutor;
+        private readonly ILogger _logger;
+        private readonly GrainExecutor _grainExecutor;
+        private readonly string _grainType;
 
         public OrleansActorTriggerListener(
-            ITriggeredFunctionExecutor executor,
-            ILogger logger)
+            ITriggeredFunctionExecutor functionExecutor,
+            string grainType,
+            ILogger logger,
+            GrainExecutor grainExecutor)
         {
-            this._executor = executor;
-            this._logger = logger;            
+            this._functionExecutor = functionExecutor;
+            this._grainType = grainType;
+            this._logger = logger;
+            this._grainExecutor = grainExecutor;
         }
 
         public void Cancel()
@@ -35,61 +40,21 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 
         public void Dispose()
         {
-            _host.Dispose();
+            
         }
 
-        public async Task StartAsync(CancellationToken cancellationToken)
+        public Task StartAsync(CancellationToken cancellationToken)
+        {            
+            _grainExecutor.RegisterFunctionExecutor(_grainType, _functionExecutor);
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
         {
-            InitializeHost();
-            await _host.StartAsync();
+            return Task.CompletedTask;
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            if (_host != null)
-                await _host.StopAsync();
-        }
-
-        private void InitializeHost()
-        {
-            if (_host == null)
-            {
-                var builder = new SiloHostBuilder()
-                   .UseLocalhostClustering()
-                   .Configure<ClusterOptions>(options =>
-                   {
-                       options.ClusterId = "dev"; // TODO: pull these from the config
-                       options.ServiceId = "AdventureApp";
-                   })
-                   .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                   .ConfigureServices(services =>
-                   {
-                       services.AddSingleton<IProxyGrainExecutor>(this);
-                   })
-                   .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(ProxyGrain).Assembly));               
-
-                _host = builder.Build();
-            }
-        }
-
-        async Task IProxyGrainExecutor.ExecuteAsync(ActorCallData data)
-        {
-            await _executor.TryExecuteAsync(new TriggeredFunctionData
-            {
-                TriggerValue = data
-            }, CancellationToken.None);
-        }
+       
     }
 
-    public class ActorCallData
-    {
-        public string State { get; set; }
-        public string EventName { get; set; }
-        public string Data { get; set; }
-    }
-
-    public interface IProxyGrainExecutor
-    {
-        Task ExecuteAsync(ActorCallData data);
-    }
 }

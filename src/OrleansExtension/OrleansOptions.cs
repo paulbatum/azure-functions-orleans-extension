@@ -7,6 +7,6 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
     public class OrleansOptions
     {
         public string StorageProviderName { get; set; }
-        public string StorageProviderSettingName { get; set; }      
+        public string StorageProviderConnectionString { get; set; }      
     }
 }

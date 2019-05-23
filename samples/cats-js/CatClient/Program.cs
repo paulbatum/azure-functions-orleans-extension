@@ -24,8 +24,8 @@ namespace CatClient
             var proxy = client.GetGrain<IProxyGrain>(Guid.NewGuid());
 
 
-            await proxy.SetState("3");
-            await proxy.Call("getStatus", "");
+            //await proxy.SetState("3");
+            await proxy.Call("Cat", "eat", "");
 
             Console.WriteLine("Done making actor calls.");
             Console.ReadLine();

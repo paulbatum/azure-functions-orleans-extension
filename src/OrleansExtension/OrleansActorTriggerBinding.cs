@@ -16,14 +16,18 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
         private readonly ParameterInfo _parameter;
         private readonly ILogger _logger;
         private readonly IReadOnlyDictionary<string, Type> _bindingContract;
-        private readonly IReadOnlyDictionary<string, object> _emptyBindingData = new Dictionary<string, object>();        
+        private readonly IReadOnlyDictionary<string, object> _emptyBindingData = new Dictionary<string, object>();
+        private readonly GrainExecutor _grainExecutor;
+        private readonly string _grainType;
 
-        public OrleansActorTriggerBinding(ParameterInfo parameter, ILogger logger)
+        public OrleansActorTriggerBinding(ParameterInfo parameter, string grainType, ILogger logger, GrainExecutor grainExecutor)
         {
-            this._parameter = parameter;
-            this._logger = logger;
+            _parameter = parameter;
+            _logger = logger;
+            _grainExecutor = grainExecutor;
+            _grainType = grainType;
 
-            this._bindingContract = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase)
+            _bindingContract = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase)
             {
                 {"EventName", typeof(string) },
                 {"Data", typeof(string) }
@@ -46,7 +50,7 @@ namespace Microsoft.Azure.WebJobs.Extensions.Orleans
 
         public Task<IListener> CreateListenerAsync(ListenerFactoryContext context)
         {
-            return Task.FromResult<IListener>(new OrleansActorTriggerListener(context.Executor, this._logger));
+            return Task.FromResult<IListener>(new OrleansActorTriggerListener(context.Executor, _grainType, this._logger, _grainExecutor));
         }
 
         public ParameterDescriptor ToParameterDescriptor()
